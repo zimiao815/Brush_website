@@ -49,6 +49,13 @@ int mypipe[2];
 char host[MAXHOSTNAMELEN];
 #define REQUEST_SIZE 2048
 char request[REQUEST_SIZE];
+typedef struct website_list_t{
+     char *pwebsite;
+	 struct website_list_t *next;
+}T_website;
+
+
+
 
 static const struct option long_options[]=
 {
