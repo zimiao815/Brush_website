@@ -13,8 +13,8 @@
  *    1 - benchmark failed (server is not on-line)
  *    2 - bad param
  *    3 - internal error, fork failed
- * 
- */ 
+ *
+ */
 #include "socket.c"
 #include <unistd.h>
 #include <sys/param.h>
@@ -73,10 +73,12 @@ static const struct option long_options[]=
 static void benchcore(const char* host,const int port, const char *request);
 static int bench(void);
 static void build_request(const char *url);
+int get_website_list();
+
 static void alarm_handler(int signal)
 {
    timerexpired=1;
-}	
+}
 
 static void usage(void)
 {
@@ -108,7 +110,7 @@ int main(int argc, char *argv[])
  {
 	  usage();
       return 2;
- } 
+ }
 
  while((opt=getopt_long(argc,argv,"912Vfrt:p:c:?h",long_options,&options_index))!=EOF )
  {
@@ -116,13 +118,13 @@ int main(int argc, char *argv[])
   {
    case  0 : break;
    case 'f': force=1;break;
-   case 'r': force_reload=1;break; 
+   case 'r': force_reload=1;break;
    case '9': http10=0;break;
    case '1': http10=1;break;
    case '2': http10=2;break;
    case 'V': printf(PROGRAM_VERSION"\n");exit(0);
-   case 't': benchtime=atoi(optarg);break;	     
-   case 'p': 
+   case 't': benchtime=atoi(optarg);break;
+   case 'p':
 	     /* proxy server parsing server:port */
 	     tmp=strrchr(optarg,':');
 	     proxyhost=optarg;
@@ -148,7 +150,7 @@ int main(int argc, char *argv[])
    case 'c': clients=atoi(optarg);break;
   }
  }
- 
+
  if(optind==argc) {
                       fprintf(stderr,"webbench: Missing URL!\n");
 		      usage();
@@ -192,6 +194,11 @@ int main(int argc, char *argv[])
  if(proxyhost!=NULL) printf(", via proxy server %s:%d",proxyhost,proxyport);
  if(force_reload) printf(", forcing reload");
  printf(".\n");
+
+ get_website_list();
+
+
+
  return bench();
 }
 
@@ -216,7 +223,7 @@ void build_request(const char *url)
 	  case METHOD_OPTIONS: strcpy(request,"OPTIONS");break;
 	  case METHOD_TRACE: strcpy(request,"TRACE");break;
   }
-		  
+
   strcat(request," ");
 
   if(NULL==strstr(url,"://"))
@@ -230,7 +237,7 @@ void build_request(const char *url)
 	 exit(2);
   }
   if(proxyhost==NULL)
-	   if (0!=strncasecmp("http://",url,7)) { 
+	   if (0!=strncasecmp("http://",url,7)) {
 	   		fprintf(stderr,"\nOnly HTTP protocol is directly supported, set --proxy for others.\n");
              exit(2);
        }
@@ -283,20 +290,20 @@ void build_request(const char *url)
   if(http10>1)
 	  strcat(request,"Connection: close\r\n");
   /* add empty line at end */
-  if(http10>0) strcat(request,"\r\n"); 
+  if(http10>0) strcat(request,"\r\n");
   // printf("Req=%s\n",request);
 }
 
 /* vraci system rc error kod */
 static int bench(void)
 {
-  int i,j,k;	
+  int i,j,k;
   pid_t pid=0;
   FILE *f;
 
   /* check avaibility of target server */
   i=Socket(proxyhost==NULL?host:proxyhost,proxyport);
-  if(i<0) { 
+  if(i<0) {
 	   fprintf(stderr,"\nConnect to server failed. Aborting benchmark.\n");
            return 1;
          }
@@ -350,14 +357,14 @@ static int bench(void)
 		 perror("open pipe for writing failed.");
 		 return 3;
 	 }
-	  fprintf(stderr,"Child - %d %d\n",speed,failed); 
+	  fprintf(stderr,"Child - %d %d\n",speed,failed);
 	 fprintf(f,"%d %d %d\n",speed,failed,bytes);
 	 fclose(f);
 	 return 0;
   } else
   {
 	  f=fdopen(mypipe[0],"r");
-	  if(f==NULL) 
+	  if(f==NULL)
 	  {
 		  perror("open pipe for reading failed.");
 		  return 3;
@@ -412,7 +419,7 @@ void benchcore(const char *host,const int port,const char *req)
  {
     if(timerexpired)
     {
-       
+
        alarm(0);
 	if(failed>0)
        {
@@ -421,21 +428,21 @@ void benchcore(const char *host,const int port,const char *req)
        }
        return;
     }
-    s=Socket(host,port);                          
-    if(s<0) { failed++;continue;} 
+    s=Socket(host,port);
+    if(s<0) { failed++;continue;}
     if(rlen!=write(s,req,rlen)) {failed++;close(s);continue;}
-    if(http10==0) 
+    if(http10==0)
 	    if(shutdown(s,1)) { failed++;close(s);continue;}
-    if(force==0) 
+    if(force==0)
     {
             /* read all available data from socket */
 	    while(1)
 	    {
-              if(timerexpired) break; 
+              if(timerexpired) break;
 	      i=read(s,buf,1500);
               /* fprintf(stderr,"%d\n",i); */
-	      if(i<0) 
-              { 
+	      if(i<0)
+              {
                  failed++;
                  close(s);
                  goto nexttry;
@@ -451,3 +458,31 @@ void benchcore(const char *host,const int port,const char *req)
     speed++;
  }
 }
+
+
+
+
+
+int get_website_list()
+{
+   FILE *fp;
+   char str[128];
+
+   /* 打开用于读取的文件 */
+   fp = fopen("./website.list" , "r");
+   if(fp == NULL) {
+      perror("open file error");
+      return(-1);
+   }
+   while ( fgets (str, 128, fp)!=NULL ) {
+      /* 向标准输出 stdout 写入内容 */
+      printf("web list is %s\n",str);
+   }
+   fclose(fp);
+
+   return(0);
+}
+
+
+
+
