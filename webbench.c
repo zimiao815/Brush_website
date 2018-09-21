@@ -23,6 +23,8 @@
 #include <strings.h>
 #include <time.h>
 #include <signal.h>
+#include <stdlib.h>
+#include <errno.h>
 
 /* values */
 volatile int timerexpired=0;
@@ -54,7 +56,7 @@ typedef struct website_list_t{
 	 struct website_list_t *next;
 }T_website;
 
-
+T_website * PLwebsite;
 
 
 static const struct option long_options[]=
@@ -80,9 +82,9 @@ static const struct option long_options[]=
 static void benchcore(const char* host,const int port, const char *request);
 static int bench(void);
 static void build_request(const char *url);
-int get_website_list();
+struct website_list_t * get_website_list( void );
 
-static void alarm_handler(int signal)
+static void alarm_handler()
 {
    timerexpired=1;
 }
@@ -202,7 +204,7 @@ int main(int argc, char *argv[])
  if(force_reload) printf(", forcing reload");
  printf(".\n");
 
- get_website_list();
+ PLwebsite=get_website_list();
 
 
 
@@ -468,26 +470,78 @@ void benchcore(const char *host,const int port,const char *req)
 
 
 
+void *
+safe_malloc(int size)
+{
+    void *retval = NULL;
+    retval = malloc(size);
+    if (!retval) {
+        printf( "Failed to malloc %d bytes of memory: %s.  Bailing out", size, strerror(errno));
+        exit(1);
+    }
+    memset(retval, 0, size);
+    return (retval);
+}
+
+/** Duplicates a string or die if memory cannot be allocated
+ * @param s String to duplicate
+ * @return A string in a newly allocated chunk of heap.
+ */
+char *
+safe_strdup(const char *s)
+{
+    char *retval = NULL;
+    if (!s) {
+        printf("safe_strdup called with NULL which would have crashed strdup. Bailing out");
+        exit(1);
+    }
+    retval = strdup(s);
+    if (!retval) {
+        printf( "Failed to duplicate a string: %s.  Bailing out", strerror(errno));
+        exit(1);
+    }
+    return (retval);
+}
 
 
-int get_website_list()
+struct website_list_t * get_website_list( void )
 {
    FILE *fp;
-   char str[128];
-
+   char str[256];
+   T_website  * p;
+   T_website  * phead=NULL;
+   T_website  * rmp=NULL;
    /* 打开用于读取的文件 */
    fp = fopen("./website.list" , "r");
    if(fp == NULL) {
       perror("open file error");
-      return(-1);
+      return(NULL);
    }
-   while ( fgets (str, 128, fp)!=NULL ) {
+   while ( fgets (str, 256, fp)!=NULL ) {
       /* 向标准输出 stdout 写入内容 */
-      printf("web list is %s\n",str);
+       //printf("web list is %s\n",str);
+      
+     	p = (T_website *)safe_malloc(sizeof(T_website));
+	    p->pwebsite = safe_strdup(str);
+
+	    if (phead == NULL) {
+			p->next = NULL;
+	        phead = p;
+			
+	    } else {
+	        p->next = phead;
+	        phead = p;
+	    }
+   
+     memset(str,0,sizeof(str));
    }
    fclose(fp);
+   for( rmp=phead;rmp;rmp=rmp->next ){
+	   printf("web list is %s\n",rmp->pwebsite);
+	   
+   }
 
-   return(0);
+   return phead;
 }
 
 
