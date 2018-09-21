@@ -46,6 +46,8 @@ int force_reload=0;
 int proxyport=80;
 char *proxyhost=NULL;
 int benchtime=30;
+char filepath[256];
+
 /* internal */
 int mypipe[2];
 char host[MAXHOSTNAMELEN];
@@ -75,6 +77,7 @@ static const struct option long_options[]=
  {"version",no_argument,NULL,'V'},
  {"proxy",required_argument,NULL,'p'},
  {"clients",required_argument,NULL,'c'},
+ {"list",required_argument,NULL,'l'},
  {NULL,0,NULL,0}
 };
 
@@ -98,6 +101,7 @@ static void usage(void)
 	"  -t|--time <sec>          Run benchmark for <sec> seconds. Default 30.\n"
 	"  -p|--proxy <server:port> Use proxy server for request.\n"
 	"  -c|--clients <n>         Run <n> HTTP clients at once. Default one.\n"
+	"  -l|--list <file>         Web site collection each line is a website address. Default NULL.\n"
 	"  -9|--http09              Use HTTP/0.9 style requests.\n"
 	"  -1|--http10              Use HTTP/1.0 protocol.\n"
 	"  -2|--http11              Use HTTP/1.1 protocol.\n"
@@ -114,14 +118,15 @@ int main(int argc, char *argv[])
  int opt=0;
  int options_index=0;
  char *tmp=NULL;
-
+ T_website * rmp;
+ memset(filepath,0,sizeof(filepath));
  if(argc==1)
  {
 	  usage();
       return 2;
  }
 
- while((opt=getopt_long(argc,argv,"912Vfrt:p:c:?h",long_options,&options_index))!=EOF )
+ while((opt=getopt_long(argc,argv,"912Vfrt:p:c:l:?h",long_options,&options_index))!=EOF )
  {
   switch(opt)
   {
@@ -157,14 +162,11 @@ int main(int argc, char *argv[])
    case 'h':
    case '?': usage();return 2;break;
    case 'c': clients=atoi(optarg);break;
+   case 'l': strncpy(filepath,optarg,strlen(optarg));break;
   }
  }
 
- if(optind==argc) {
-                      fprintf(stderr,"webbench: Missing URL!\n");
-		      usage();
-		      return 2;
-                    }
+
 
  if(clients==0) clients=1;
  if(benchtime==0) benchtime=60;
@@ -172,7 +174,7 @@ int main(int argc, char *argv[])
  fprintf(stderr,"Webbench - Simple Web Benchmark "PROGRAM_VERSION"\n"
 	 "Copyright (c) Radim Kolar 1997-2004, GPL Open Source Software.\n"
 	 );
- build_request(argv[optind]);
+
  /* print bench info */
  printf("\nBenchmarking: ");
  switch(method)
@@ -203,12 +205,26 @@ int main(int argc, char *argv[])
  if(proxyhost!=NULL) printf(", via proxy server %s:%d",proxyhost,proxyport);
  if(force_reload) printf(", forcing reload");
  printf(".\n");
+	if(optind==argc) {
+		  fprintf(stderr,"webbench: Missing URL!\n");
+		  if( strlen(filepath) == 0 ){
+			   usage();
+			   return (-1); 
+		   }
 
- PLwebsite=get_website_list();
+	}else{
+		  build_request(argv[optind]);
+		  bench();
+		  return 0;
+	}
+    PLwebsite=get_website_list();
+   for( rmp=PLwebsite;rmp;rmp=rmp->next ){
+	   printf("web list is %s\n",rmp->pwebsite);
+	   build_request(rmp->pwebsite);
+	   bench();
+   }
 
-
-
- return bench();
+ return 0;
 }
 
 void build_request(const char *url)
@@ -510,15 +526,15 @@ struct website_list_t * get_website_list( void )
    char str[256];
    T_website  * p;
    T_website  * phead=NULL;
-   T_website  * rmp=NULL;
-   /* 打开用于读取的文件 */
-   fp = fopen("./website.list" , "r");
+
+
+   fp = fopen(filepath , "r");
    if(fp == NULL) {
       perror("open file error");
       return(NULL);
    }
    while ( fgets (str, 256, fp)!=NULL ) {
-      /* 向标准输出 stdout 写入内容 */
+
        //printf("web list is %s\n",str);
       
      	p = (T_website *)safe_malloc(sizeof(T_website));
@@ -536,10 +552,7 @@ struct website_list_t * get_website_list( void )
      memset(str,0,sizeof(str));
    }
    fclose(fp);
-   for( rmp=phead;rmp;rmp=rmp->next ){
-	   printf("web list is %s\n",rmp->pwebsite);
-	   
-   }
+
 
    return phead;
 }
